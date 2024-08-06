@@ -43,8 +43,10 @@ RUN apt-get update && \
     terraform \ 
     apt-transport-https \
     helm \
+    jq \
     && \
     rm -rf /var/lib/apt/lists/*
+    
 
 RUN chmod +x script.sh
 

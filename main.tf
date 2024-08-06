@@ -26,17 +26,9 @@ terraform {
 provider "google" {
   project     = var.projectName
   region      = var.region
-  credentials = file("secret.json")
+  credentials = file("./secret.json")
 }
 
-provider "kubernetes" {
-  config_path = "~/.kube/config"
- }
-
-
-provider "kubectl" {
-  config_path = "~/.kube/config"
-}
 
 
 
@@ -146,7 +138,7 @@ resource "google_project_service" "storage_api" {
 
 resource "google_project_service" "storage" {
   project = var.projectName
-  service            = "storage-component.googleapis.com"
+  service = "storage-component.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
@@ -196,6 +188,36 @@ resource "google_project_service" "cloud_build_api" {
 
 resource "google_project_service" "monitoring_api" {
   service = "monitoring.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "eventarc" {
+  service = "eventarc.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "eventarc_publishing_api" {
+  service = "eventarcpublishing.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "dialogflow" {
+  service = "dialogflow.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "Cloud_Dataplex_API" {
+  service = "dataplex.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "Cloud_Datastore_API" {
+  service = "datastore.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
@@ -619,22 +641,6 @@ resource "google_container_node_pool" "general" {
   depends_on = [ google_container_cluster.disearch_cluster ]
 }
 
-// kubernetes service account
-resource "kubernetes_service_account" "ksa" {
-  metadata {
-    name      = "gke-sa"
-    namespace = "default"
-    annotations = {
-      "iam.gke.io/gcp-service-account" = google_service_account.workload_identity_user_sa.email
-    }
-  }
-}
-
-resource "google_project_iam_member" "workload_identity_role" {
-  project = data.google_client_config.current.project
-  role    = "roles/iam.workloadIdentityUser"
-  member  = "serviceAccount:${var.projectName}.svc.id.goog[default/gke-sa]"
-}
 
 
 
@@ -676,31 +682,23 @@ resource "time_sleep" "wait_90_seconds" {
 data "google_client_config" "default" { depends_on = [ time_sleep.wait_90_seconds ] }
 
 
-data "template_file" "kubeconfig" {
-  template = file("./kubeconfig.tpl")
+# data "template_file" "kubeconfig" {
+#   template = file("./kubeconfig.tpl")
 
-  vars = {
-    cluster_name           = var.gke_cluster_name
-    cluster_endpoint       = "https://${google_container_cluster.disearch_cluster.endpoint}"
-    cluster_ca_certificate = google_container_cluster.disearch_cluster.master_auth[0].cluster_ca_certificate
-  }
-  depends_on = [ data.google_client_config.default ]
-}
+#   vars = {
+#     cluster_name           = var.gke_cluster_name
+#     cluster_endpoint       = "https://${google_container_cluster.disearch_cluster.endpoint}"
+#     cluster_ca_certificate = google_container_cluster.disearch_cluster.master_auth[0].cluster_ca_certificate
+#   }
+#   depends_on = [ data.google_client_config.default ]
+# }
 
-resource "local_file" "kubeconfig" {
-  content  = data.template_file.kubeconfig.rendered
-  filename = "kubeconfig.yaml"
-  depends_on = [ data.template_file.kubeconfig ]
-}
+# resource "local_file" "kubeconfig" {
+#   content  = data.template_file.kubeconfig.rendered
+#   filename = "kubeconfig.yaml"
+#   depends_on = [ data.template_file.kubeconfig ]
+# }
 
-
-//Additional 120 Second Delay
-
-resource "time_sleep" "wait_another_120_seconds" {
-  depends_on = [ local_file.kubeconfig ]
-
-  create_duration = "120s"
-}
 
 # Create secrets in Google Secret Manager
 
@@ -764,7 +762,7 @@ resource "google_secret_manager_secret" "GCP_BUCKET" {
 
 resource "google_secret_manager_secret_version" "GCP_BUCKET_version" {
   secret      = google_secret_manager_secret.GCP_BUCKET.id
-  secret_data = var.storage_bucket_name
+  secret_data = google_storage_bucket.disearch_storage_bucket.name
 }
 
 resource "google_secret_manager_secret" "image_summary_cloud_fn" {
@@ -869,7 +867,7 @@ resource "google_secret_manager_secret" "service_key" {
 
 resource "google_secret_manager_secret_version" "service_key_version" {
   secret      = google_secret_manager_secret.service_key.id
-  secret_data = file("./my-service-account-key.json")
+  secret_data = file("./secret.json")
 }
 
 resource "google_secret_manager_secret" "status_cloud_fn" {
@@ -923,23 +921,37 @@ resource "google_secret_manager_secret" "vertexai-referer" {
   }
 }
 
-resource "google_secret_manager_secret_version" "vertexai_referer_version" {
-  secret      = google_secret_manager_secret.vertexai_referer.id
-  secret_data = "Authencation URL"
-}
 
-resource "google_secret_manager_secret" "vertexai_summary" {
-  secret_id = "vertexai_summary"
+resource "google_secret_manager_secret" "vertexai-summary" {
+  secret_id = "vertexai-summary"
   replication {
     automatic = true
   }
 }
 
-
-
-data "google_project" "project" {
+resource "google_secret_manager_secret" "APP_VERSION" {
+  secret_id = "APP_VERSION"
+  replication {
+    automatic = true
+  }
 }
 
-output "project_number" {
-  value = data.google_project.project.number
+resource "google_secret_manager_secret_version" "APP_VERSION_version" {
+  secret      = google_secret_manager_secret.APP_VERSION.id
+  secret_data = var.APP_VERSION
 }
+
+resource "google_secret_manager_secret" "OPENAI_API_KEY" {
+  secret_id = "OPENAI_API_KEY"
+  replication {
+    automatic = true
+  }
+}
+
+resource "google_secret_manager_secret_version" "OPENAI_API_KEY_version" {
+  secret      = google_secret_manager_secret.OPENAI_API_KEY.id
+  secret_data = var.OPENAI_API_KEY
+}
+
+
+

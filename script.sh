@@ -8,9 +8,6 @@
 
 
 
-
-
-
 #  _____           _           _      _____             __ _        __      __        _       _     _
 # |  __ \         (_)         | |    / ____|           / _(_)       \ \    / /       (_)     | |   | |
 # | |__) | __ ___  _  ___  ___| |_  | |     ___  _ __ | |_ _  __ _   \ \  / /_ _ _ __ _  __ _| |__ | | ___  ___
@@ -20,18 +17,25 @@
 #                _/ |                                         __/ |
 #               |__/                                         |___/
 
-# PROJECT_ID="world-learning-400909"
-# PROJECT_NUMBER="22927148231"
+
+echo "Project ID is $PROJECT_ID"
+#PROJECT_ID="world-learning-400909"  
+echo "Project Number is $PROJECT_NUMBER"  
+#PROJECT_NUMBER="22927148231"             
 REGION="us-central1"
 APP_NAME="disearch"
-DEFAULT_OWNER_EMAIL="aareez@hypremia.com"
+echo "Default Owner Email is $DEFAULT_OWNER_EMAIL"
+#DEFAULT_OWNER_EMAIL="aareez@hypremia.com"
 PULL_IMAGE_FROM='aretecinc-public'
+echo "$WEBSITE_URL"
 # WEBSITE_URL="apps.disearch.ai"
 APP_VERSION='INDIVIDUAL'
 SERVICE_ACCOUNT="gke-sa@$PROJECT_ID.iam.gserviceaccount.com"
 GKE_SERVICE_ACCOUNT="gke-sa@$PROJECT_ID.iam.gserviceaccount.com"
 OPEN_AI_KEY=""
 RABBITMQ_PASS=""
+REDIS_PASS="UmVkaXMxMjMkJV4uLg=="
+
 
 
 #Images Variables
@@ -135,10 +139,9 @@ terraform apply -var="projectName=$PROJECT_ID" -auto-approve
 
 
 
+# Variables  
+gcloud container clusters get-credentials disearch-cluster --zone us-central1-c --project $PROJECT_ID
 
-
-
-# Variables
 kubectl create serviceaccount gke-sa --namespace=default
 
 gcloud iam service-accounts add-iam-policy-binding gke-sa@$PROJECT_ID.iam.gserviceaccount.com \
@@ -216,10 +219,14 @@ DB_PASSWORD=$(gcloud secrets versions access latest --secret="$SECRET_DB_PASSWOR
 CONN_STRING="postgresql://postgres:${DB_PASSWORD}@${DB_HOST}/postgres"
 
 # Encode the connection string in base64
-ENCODED_CONN_STRING=$(echo -n "$CONN_STRING" | base64)
+ENCODED_CONN_STRING=$(echo -n "$CONN_STRING" | base64 -w 0)
 
 # Output the encoded connection string
 echo "$ENCODED_CONN_STRING"
+
+# Decode to verify
+DECODED_CONN_STRING=$(echo $ENCODED_CONN_STRING | base64 --decode)
+echo $DECODED_CONN_STRING
 
 
 
@@ -242,27 +249,35 @@ helm show values aretec-public/etcd > etcd-values.yaml
 gcloud container clusters get-credentials disearch-cluster --zone us-central1-c --project $PROJECT_ID
 
 # Replacing Values
-#Fetch Cluster Internal Endpoint
+#Fetch Cluster Internal Endpoint  
 CLUSTER_NAME="disearch-cluster"
-CLUSTER_ZONE="us-central1-c"  # Replace with the appropriate zone
-DOCUMENT_STATUS_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/uploader-trigger"
+CLUSTER_ZONE="us-central1-c" 
+DOCUMENT_STATUS_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/document-status"
 IMAGE_PROCESSING_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/image-processing"
 METADATA_INJECTED_DOCUMENT_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/update_metadata_ingested_document"
 
-
 # Fetch the cluster endpoint using gcloud
-INTERNAL_ENDPOINT=$(gcloud container clusters describe "$CLUSTER_NAME" --zone "$CLUSTER_ZONE" --format="get(privateClusterConfig.privateEndpoint)")
+PRIVATE_ENDPOINT=$(gcloud container clusters describe "$CLUSTER_NAME" --zone "$CLUSTER_ZONE" --format="get(privateClusterConfig.privateEndpoint)")
 
-# Output the internal endpoint
-echo "Internal Endpoint: $INTERNAL_ENDPOINT"
+# Prefix with http:// and encode to base64
+INTERNAL_ENDPOINT=$(echo -n "https://$PRIVATE_ENDPOINT" | base64)
+
+# Print the result (optional)
+echo "INTERNAL_ENDPOINT: $INTERNAL_ENDPOINT"
+
+# Decode the Base64 encoded endpoint
+DECODED_ENDPOINT=$(echo -n "$INTERNAL_ENDPOINT" | base64 --decode)
+
+# Print the decoded result
+echo "Decoded INTERNAL_ENDPOINT: $DECODED_ENDPOINT"
 
 #Replace project id
-sed -i "s|REPLACE_WITH_PROJECT_ID|$PROJECT_ID|g" gke-values.yaml
+sed -i "s|REPLACE_WITH_PROJECT_ID|$PULL_IMAGE_FROM|g" gke-values.yaml
 
-sed -i "s|REPLACE_WITH_KUBEAPI_SERVER_URL|https://$INTERNAL_ENDPOINT|g" gke-values.yaml
+sed -i "s|REPLACE_WITH_KUBEAPI_SERVER_URL|$INTERNAL_ENDPOINT|g" gke-values.yaml
 echo "Updated gke-values.yaml with the internal endpoint URL."
 
-sed -i "s/REPLACE_SQL_DB_CONNECTION/$ENCODED_CONN_STRING/g" gke-values.yaml
+sed -i "s/REPLACE_SQL_DB_CONNECTION/$ENCODED_CONN_STRING/g" gke-values.yaml  
 echo "Updated gke-values.yaml with the database connection string."
 
 sed -i "s|REPLACE_WITH_DOCUMENT_STATUS_CF_URL|$DOCUMENT_STATUS_CF_URL|g" gke-values.yaml
@@ -274,10 +289,13 @@ echo "Updated gke-values.yaml with the Document Status CF URL."
 sed -i "s|REPLACE_WITH_UPDATE_METADATA_INJECTED_DOCUMENT|$METADATA_INJECTED_DOCUMENT_CF_URL|g" gke-values.yaml
 echo "Updated gke-values.yaml with the Document Status CF URL."
 
-helm install keda kedacore/keda --namespace keda --create-namespace
-helm install gke-templates aretec-public/gke-templates -f gke-values.yaml
-helm install redis aretec-public/redis -f redis-values.yaml
-helm install etcd aretec-public/etcd -f etcd-values.yaml
+sed -i "s|REPLACE_WITH_PASSWORD|$REDIS_PASS|g" redis-values.yaml
+echo "Updated Redis password in redis-values.yaml."
+
+helm upgrade --install keda kedacore/keda --namespace keda --create-namespace
+helm upgrade --install gke-templates aretec-public/gke-templates --values ./gke-values.yaml
+helm upgrade --install redis aretec-public/redis --values ./redis-values.yaml
+helm upgrade --install etcd aretec-public/etcd --values ./etcd-values.yaml
 
 
 #   _____ _                 _   ______                _   _
@@ -287,7 +305,9 @@ helm install etcd aretec-public/etcd -f etcd-values.yaml
 # | |____| | (_) | |_| | (_| | | |  | |_| | | | | (__| |_| | (_) | | | \__ \
 #  \_____|_|\___/ \__,_|\__,_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
 # Get the bucket name from Terraform output & Exporting  Bucket Variable
-BUCKET_NAME=$(terraform output -raw bucket_name)
+#
+
+BUCKET_NAME=$(gcloud secrets versions access latest --secret="GCP_BUCKET")
 
 # Pass the bucket name to your script
 echo "Bucket name: $BUCKET_NAME"
@@ -299,8 +319,14 @@ git clone https://github.com/Aretec-Inc/image-process-cfobf.git
 git clone https://github.com/Aretec-Inc/metadata-extractor-cfobf.git
 git clone https://github.com/Aretec-Inc/pdf-convert-cfobf.git
 
+GCS_SERVICE_ACCOUNT=$(gsutil kms serviceaccount -p $PROJECT_NUMBER)
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member serviceAccount:$GCS_SERVICE_ACCOUNT \
+  --role roles/pubsub.publisher
+
 echo "Deploying uploader-trigger"
-cd uploader-trigger-cf
+cd uploader-trigger-cfobf
 gcloud functions deploy uploader-trigger \
   --runtime python39 \
   --entry-point uploader \
@@ -316,7 +342,7 @@ gcloud functions deploy uploader-trigger \
 
 echo "Deploying document-status"
 cd ..
-cd document-status-cf
+cd document-status-cfobf
 gcloud functions deploy document-status \
   --runtime python39 \
   --trigger-http \
@@ -331,7 +357,7 @@ gcloud functions deploy document-status \
 
 echo "Deploying image-processing"
 cd ..
-cd image-process-cf
+cd image-process-cfobf
 gcloud functions deploy image-processing \
   --runtime python39 \
   --entry-point my_http_function \
@@ -344,10 +370,11 @@ gcloud functions deploy image-processing \
   --gen2 \
   --region us-central1 \
   --memory 2G
+  --quiet 
 
 echo "Deploying Metadata Extractor"
 cd ..
-cd metadata-extractor-cf
+cd metadata-extractor-cfobf
 gcloud functions deploy update_metadata_ingested_document \
   --runtime python39 \
   --trigger-http \
@@ -356,6 +383,7 @@ gcloud functions deploy update_metadata_ingested_document \
   --set-secrets=project_id=projects/$PROJECT_ID/secrets/project_id:latest \
   --service-account $GKE_SERVICE_ACCOUNT \
   --vpc-connector disearch-vpc-connector --region us-central1 --serve-all-traffic-latest-revision --gen2 --memory 1G
+  --quiet
 
 
 
@@ -449,6 +477,9 @@ gcloud pubsub topics create metadata-topic
 # Create the 'pdf-convert-topic'
 gcloud pubsub topics create pdf-convert-topic
 
+# Create the 'dead-letter-topic'
+gcloud pubsub topics create dead-letter-topic
+
 gcloud pubsub topics list
 
 echo "creating subscriptions"
@@ -532,23 +563,61 @@ REDIS_URL="redis://default:$REDIS_PASSWORD@redis-master:6379"
 update_or_create_secret "redis-url" "$REDIS_URL"
 
 # Get IPs and update/create other secrets
-update_or_create_secret "DOCUMENT_CHAT_URL" $(kubectl get service doc-chat-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-update_or_create_secret "vertexai_followup" $(kubectl get service vertex-ai-followup-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-update_or_create_secret "vertexai_citation" $(kubectl get service vertexai-citation-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-update_or_create_secret "vertexai_python_url" $(kubectl get service vertexai-deployment-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-update_or_create_secret "vertexai-summary" $(kubectl get service vertexai-summary-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-update_or_create_secret "pdf_loadbalancer" $(kubectl get service pdflb -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+update_or_create_secret "DOCUMENT_CHAT_URL" $(kubectl get service doc-chat-service -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
+update_or_create_secret "vertexai_followup" $(kubectl get service vertex-ai-followup-service -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
+update_or_create_secret "vertexai_citation" $(kubectl get service vertexai-citation-service -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
+update_or_create_secret "vertexai_python_url" $(kubectl get service vertexai-service -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
+update_or_create_secret "vertexai-summary" $(kubectl get service vertexai-summary-service -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
+update_or_create_secret "pdf_loadbalancer" $(kubectl get service pdflb -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
+
+
+# Replace for vertexai-referer secret
+SECRET_NAME="vertexai-referer"
+NEW_VERSION_DATA="$WEBSITE_URL"
+
+# Encode the new version data to Base64 (optional, if needed)
+ENCODED_NEW_DATA=$(echo -n "$NEW_VERSION_DATA" | base64)
+
+# Retrieve existing versions of the secret
+EXISTING_VERSIONS=$(gcloud secrets versions list "$SECRET_NAME" --format="value(name)")
+
+# Function to decode and check if the value exists
+check_existing_data() {
+  for version in $EXISTING_VERSIONS; do
+    EXISTING_DATA=$(gcloud secrets versions access "$version" --secret="$SECRET_NAME")
+    ENCODED_EXISTING_DATA=$(echo -n "$EXISTING_DATA" | base64)
+    if [ "$ENCODED_NEW_DATA" == "$ENCODED_EXISTING_DATA" ]; then
+      echo "The new version data already exists in version $version."
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Check if the new version data already exists
+if check_existing_data; then
+  echo "The new version data already exists. Skipping adding a new version."
+else
+  # Create a temporary file to hold the new version data
+  TMP_FILE=$(mktemp)
+  echo -n "$NEW_VERSION_DATA" > "$TMP_FILE"
+
+  # Add the new version to the existing secret
+  gcloud secrets versions add "$SECRET_NAME" --data-file="$TMP_FILE"
+
+  # Clean up the temporary file
+  rm "$TMP_FILE"
+
+  # Print a success message
+  echo "New version added to secret $SECRET_NAME."
+fi
 
 
 
-
-
-
-
-
-
-
-
+echo "Replacing Values For Cors"
+sed -i "s|REPLACE_WITH_WEBSITE_URL|$WEBSITE_URL|g" cors.json
+gsutil set cors cors.json gs://$BUCKET_NAME
+gsutil get cors gs://$BUCKET_NAME
 
 #   _____ _                 _   _____
 #  / ____| |               | | |  __ \
@@ -559,22 +628,40 @@ update_or_create_secret "pdf_loadbalancer" $(kubectl get service pdflb -o=jsonpa
 
 
 echo "Deploying file-upload-pubsub "
-gcloud run deploy file-upload-pubsub --image=$FILE_UPLOAD_PUBSUB_ID --set-env-vars=batch_size=8,project_id=$PROJECT_ID  --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=vertexai_python_url=vertexai_python_url:latest,metadata_cloud_fn=metadata_cloud_fn:latest,image_summary_cloud_fn=image_summary_cloud_fn:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
+gcloud run deploy file-upload-pubsub --image=$FILE_UPLOAD_PUBSUB_ID --set-env-vars=batch_size=1,project_id=$PROJECT_ID  --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=vertexai_python_url=vertexai_python_url:latest,metadata_cloud_fn=metadata_cloud_fn:latest,image_summary_cloud_fn=image_summary_cloud_fn:latest,APP_VERSION=APP_VERSION:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
 
 echo "Deploying image-pubsub"
-gcloud run deploy image-pubsub --image=$IMAGE_PUBSUB_ID --set-env-vars=image_subscription_id=image-subscription,project_id=$PROJECT_ID,batch_size=5,project_id=$PROJECT_ID  --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=vertexai_python_url=vertexai_python_url:latest,metadata_cloud_fn=metadata_cloud_fn:latest,image_summary_cloud_fn=image_summary_cloud_fn:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
+gcloud run deploy image-pubsub --image=$IMAGE_PUBSUB_ID --set-env-vars=image_subscription_id=image-subscription,project_id=$PROJECT_ID,batch_size=1,project_id=$PROJECT_ID  --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=vertexai_python_url=vertexai_python_url:latest,metadata_cloud_fn=metadata_cloud_fn:latest,image_summary_cloud_fn=image_summary_cloud_fn:latest,APP_VERSION=APP_VERSION:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
 
 echo "Deploying metadata-pubsub"
-gcloud run deploy metadata-pubsub --image=$METADATA_PUBSUB_ID --set-env-vars=project_id=$PROJECT_ID,batch_size=2 --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=vertexai_python_url=vertexai_python_url:latest,metadata_cloud_fn=metadata_cloud_fn:latest,image_summary_cloud_fn=image_summary_cloud_fn:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
+gcloud run deploy metadata-pubsub --image=$METADATA_PUBSUB_ID --set-env-vars=project_id=$PROJECT_ID,batch_size=1 --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=vertexai_python_url=vertexai_python_url:latest,metadata_cloud_fn=metadata_cloud_fn:latest,image_summary_cloud_fn=image_summary_cloud_fn:latest,APP_VERSION=APP_VERSION:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
 
 echo "Deploying pdf-convert-pubsub"
-gcloud run deploy pdf-convert-pubsub --image=$PDF_CONVERT_PUBSUB_ID --set-env-vars=batch_size=5,project_id=$PROJECT_ID --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=pdf_loadbalancer=pdf_loadbalancer:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
+gcloud run deploy pdf-convert-pubsub --image=$PDF_CONVERT_PUBSUB_ID --set-env-vars=batch_size=1,project_id=$PROJECT_ID --platform managed  --vpc-connector=projects/$PROJECT_ID/locations/us-central1/connectors/disearch-vpc-connector --set-secrets=pdf_loadbalancer=pdf_loadbalancer:latest,APP_VERSION=APP_VERSION:latest --region=us-central1 --project=$PROJECT_ID --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com --allow-unauthenticated --min-instances=1 --max-instances=2
 
 echo "Deploying DiSearch Cloud Run"
-gcloud run deploy disearch-vertexai \
---image=gcr.io/$PULL_IMAGE_FROM/disearch \
---set-env-vars=ALLOWED_ORIGIN=$WEBSITE_URL,APP_VERSION=INDIVIDUAL,appName=disearch,schema=disearch,AUTH_EMAIL=$DEFAULT_OWNER_EMAIL \
---set-cloudsql-instances=$PROJECT_ID:$REGION:disearch-db \
---set-secrets=service_key=service_key:latest,DB_USER=DB_USER:latest,GCP_BUCKET=GCP_BUCKET:latest,DB_HOST=DB_HOST:latest,DB_PASSWORD=DB_PASSWORD:latest,DOCUMENT_CHAT_URL=DOCUMENT_CHAT_URL:latest,LOG_INDEX=LOG_INDEX:latest,project_id=project_id:latest,vertex_ai_search_summary_url=vertexai-summary:latest,vertex_ai_followup_url=vertexai_followup:latest,IS_VERTEX_AI=IS_VERTEXAI:latest,vertex_ai_search_base_url=vertexai_citation:latest,vertex_ai_init_base_url=vertexai_python_url:latest \
---region=$REGION \
+gcloud run deploy disearch \
+--image=gcr.io/aretecinc-public/ \
+--set-env-vars=ALLOWED_ORIGIN=$WEBSITE_URL --set-env-vars=appName=disearch --set-env-vars=schema=disearch --set-env-vars=AUTH_EMAIL=$DEFAULT_OWNER_EMAIL --set-env-vars=IS_PENSDOWN=false --set-env-vars=IS_CONTEXT=false \
+--set-cloudsql-instances=$PROJECT_ID:us-central1:disearch-db \
+--service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com \
+--set-secrets=service_key=service_key:latest,DB_USER=DB_USER:latest,GCP_BUCKET=GCP_BUCKET:latest,DB_HOST=DB_HOST:latest,DB_PASSWORD=DB_PASSWORD:latest,DOCUMENT_CHAT_URL=DOCUMENT_CHAT_URL:latest,LOG_INDEX=LOG_INDEX:latest,project_id=project_id:latest,vertex_ai_search_summary_url=vertexai-summary:latest,vertex_ai_followup_url=vertexai_followup:latest,IS_VERTEX_AI=IS_VERTEXAI:latest,vertex_ai_search_base_url=vertexai_citation:latest,vertex_ai_init_base_url=vertexai_python_url:latest,APP_VERSION=APP_VERSION:latest \
+--no-cpu-boost \
+--region=us-central1 \
 --project=$PROJECT_ID
+
+# Extract the domain from the URL
+DOMAIN=$(echo $WEBSITE_URL | awk -F[/:] '{print $4}')
+
+# Print the variables (optional)
+echo "WEBSITE_URL: $WEBSITE_URL"
+echo "DOMAIN: $DOMAIN"
+
+echo "Domain Mapping on Managed Cloud RUN"
+gcloud beta run domain-mappings create --service disearch --domain $DOMAIN --region $REGION
+
+
+
+
+
+

@@ -149,6 +149,19 @@ variable "SCHEMA" {
   default     = "disearch"
 }
 
+variable "OPENAI_API_KEY" {
+  description = "KEY"
+  type        = string
+  default     = "value-for-open-ai-key"
+}
+
+variable "APP_VERSION" {
+  description = "value"
+  type        = string
+  default     = "ST"
+}
+
+
 
 
 
