@@ -1,0 +1,14 @@
+Below are the minimul IAM  roles that need to assign to the gcp service account named terraform and use this terraform service account key as variable in cloud run job. so the cloud run job can have access to make changes on said resource.
+
+
+Compute Admin
+Compute Storage Admin
+Editor
+Kubernetes Engine Admin
+Monitoring Viewer
+Project IAM Admin
+Secret Manager Admin
+Serverless VPC Access Admin
+Service Networking Admin
+Storage Admin
+owner
