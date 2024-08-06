@@ -1,0 +1,24 @@
+#Script to make artifacts(images) public available in different project.
+
+#First, ensure that your Artifact Registry repository exists and contains the images you want to make public.
+gcloud artifacts repositories list --project=<your-project-id>
+
+
+#!/bin/bash
+
+# Variables
+PROJECT_ID="aretecinc-public"
+REPO_NAME="gcr.io"
+REPO_LOCATION="us"
+
+# Authenticate with gcloud
+gcloud auth login
+
+# Make the repository public
+gcloud artifacts repositories add-iam-policy-binding ${REPO_NAME} \
+  --location=${REPO_LOCATION} \
+  --role="roles/artifactregistry.reader" \
+  --member="allUsers"
+
+# Verify the policy
+gcloud artifacts repositories get-iam-policy ${REPO_NAME} --location=${REPO_LOCATION}
