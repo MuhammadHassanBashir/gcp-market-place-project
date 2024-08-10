@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # ██████  ██ ███████ ███████  █████  ██████   ██████ ██   ██
 # ██   ██ ██ ██      ██      ██   ██ ██   ██ ██      ██   ██
 # ██   ██ ██ ███████ █████   ███████ ██████  ██      ███████
@@ -19,9 +18,9 @@
 
 
 echo "Project ID is $PROJECT_ID"
-#PROJECT_ID="world-learning-400909"  
-echo "Project Number is $PROJECT_NUMBER"  
-#PROJECT_NUMBER="22927148231"             
+#PROJECT_ID="world-learning-400909"
+echo "Project Number is $PROJECT_NUMBER"
+#PROJECT_NUMBER="22927148231"
 REGION="us-central1"
 APP_NAME="disearch"
 echo "Default Owner Email is $DEFAULT_OWNER_EMAIL"
@@ -35,22 +34,16 @@ GKE_SERVICE_ACCOUNT="gke-sa@$PROJECT_ID.iam.gserviceaccount.com"
 OPEN_AI_KEY=""
 RABBITMQ_PASS=""
 REDIS_PASS="UmVkaXMxMjMkJV4uLg=="
-
+TAG="1.0.8"
 
 
 #Images Variables
-DOC_CHAT_ID="gcr.io/$PROJECT_ID/doc_chat:latest"
-FILE_UPLOAD_PUBSUB_ID="gcr.io/$PROJECT_ID/file-upload-pubsub:latest"
-IMAGE_PUBSUB_ID="gcr.io/$PROJECT_ID/image-pubsub:latest"
-METADATA_PUBSUB_ID="gcr.io/$PROJECT_ID/metadata-pubsub:latest"
-PDF_CONVERT_ID="gcr.io/$PROJECT_ID/pdf_convert:latest"
-PDF_CONVERT_PUBSUB_ID="gcr.io/$PROJECT_ID/pdf-convert-pubsub:latest"
-VERTEX_AI_CITATION_ID="gcr.io/$PROJECT_ID/vertexai-citation:latest"
-VERTEX_AI_SUMMMARY_ID="gcr.io/$PROJECT_ID/vertex-ai-summary:latest"
-VERTEX_AI_FOLLOWUP_ID="gcr.io/$PROJECT_ID/vertex-ai-followup:latest"
-VERTEX_AI_INIT_ID="gcr.io/$PROJECT_ID/vertexai:latest"
-PDF_LOADBALANCER_ID="gcr.io/$PROJECT_ID/pdf-loadbalancer:latest"
-
+FILE_UPLOAD_PUBSUB_ID="gcr.io/$PULL_IMAGE_FROM/disearch/file-upload-pubsub:$TAG"
+IMAGE_PUBSUB_ID="gcr.io/$PULL_IMAGE_FROM/disearch/image-pubsub:$TAG"
+METADATA_PUBSUB_ID="gcr.io/$PULL_IMAGE_FROM/disearch/metadata-pubsub:$TAG"
+PDF_CONVERT_PUBSUB_ID="gcr.io/$PULL_IMAGE_FROM/disearch/pdf-convert-pubsub:$TAG"
+DISEARCH_IMAGE_ID="gcr.io/$PULL_IMAGE_FROM/disearch/disearch:$TAG"
+LLM_MODEL_IMPORT_ID="gcr.io/$PULL_IMAGE_FROM/disearch/llm-migrations:$TAG"
 
 
 
@@ -139,7 +132,7 @@ terraform apply -var="projectName=$PROJECT_ID" -auto-approve
 
 
 
-# Variables  
+# Variables
 gcloud container clusters get-credentials disearch-cluster --zone us-central1-c --project $PROJECT_ID
 
 kubectl create serviceaccount gke-sa --namespace=default
@@ -249,9 +242,9 @@ helm show values aretec-public/etcd > etcd-values.yaml
 gcloud container clusters get-credentials disearch-cluster --zone us-central1-c --project $PROJECT_ID
 
 # Replacing Values
-#Fetch Cluster Internal Endpoint  
+#Fetch Cluster Internal Endpoint
 CLUSTER_NAME="disearch-cluster"
-CLUSTER_ZONE="us-central1-c" 
+CLUSTER_ZONE="us-central1-c"
 DOCUMENT_STATUS_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/document-status"
 IMAGE_PROCESSING_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/image-processing"
 METADATA_INJECTED_DOCUMENT_CF_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net/update_metadata_ingested_document"
@@ -277,7 +270,7 @@ sed -i "s|REPLACE_WITH_PROJECT_ID|$PULL_IMAGE_FROM|g" gke-values.yaml
 sed -i "s|REPLACE_WITH_KUBEAPI_SERVER_URL|$INTERNAL_ENDPOINT|g" gke-values.yaml
 echo "Updated gke-values.yaml with the internal endpoint URL."
 
-sed -i "s/REPLACE_SQL_DB_CONNECTION/$ENCODED_CONN_STRING/g" gke-values.yaml  
+sed -i "s/REPLACE_SQL_DB_CONNECTION/$ENCODED_CONN_STRING/g" gke-values.yaml
 echo "Updated gke-values.yaml with the database connection string."
 
 sed -i "s|REPLACE_WITH_DOCUMENT_STATUS_CF_URL|$DOCUMENT_STATUS_CF_URL|g" gke-values.yaml
@@ -313,11 +306,11 @@ BUCKET_NAME=$(gcloud secrets versions access latest --secret="GCP_BUCKET")
 echo "Bucket name: $BUCKET_NAME"
 
 # Clone the GitHub repository
-git clone https://github.com/Aretec-Inc/uploader-trigger-cfobf.git
-git clone https://github.com/Aretec-Inc/document-status-cfobf.git
-git clone https://github.com/Aretec-Inc/image-process-cfobf.git
-git clone https://github.com/Aretec-Inc/metadata-extractor-cfobf.git
-git clone https://github.com/Aretec-Inc/pdf-convert-cfobf.git
+git clone https://github.com/Aretec-Inc/uploader-trigger-cf.git
+git clone https://github.com/Aretec-Inc/document-status-cf.git
+git clone https://github.com/Aretec-Inc/image-process-cf.git
+git clone https://github.com/Aretec-Inc/metadata-extractor-cf.git
+git clone https://github.com/Aretec-Inc/pdf-convert-cf.git
 
 GCS_SERVICE_ACCOUNT=$(gsutil kms serviceaccount -p $PROJECT_NUMBER)
 
@@ -326,10 +319,11 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role roles/pubsub.publisher
 
 echo "Deploying uploader-trigger"
-cd uploader-trigger-cfobf
+cd uploader-trigger-cf
+git checkout deployment
 gcloud functions deploy uploader-trigger \
   --runtime python39 \
-  --entry-point uploader \
+  --entry-point main_func \
   --set-env-vars=LOG_EXECUTION_ID=true \
   --set-secrets=bucket=projects/$PROJECT_ID/secrets/GCP_BUCKET:latest,project_id=projects/$PROJECT_ID/secrets/project_id:latest \
   --service-account $GKE_SERVICE_ACCOUNT \
@@ -342,11 +336,12 @@ gcloud functions deploy uploader-trigger \
 
 echo "Deploying document-status"
 cd ..
-cd document-status-cfobf
+cd document-status-cf
+git checkout deployment
 gcloud functions deploy document-status \
   --runtime python39 \
   --trigger-http \
-  --entry-point update_status \
+  --entry-point main_func \
   --set-secrets 'DB_HOST=DB_HOST:latest,DB_USER=DB_USER:latest,DB_PASSWORD=DB_PASSWORD:latest' \
   --service-account  $GKE_SERVICE_ACCOUNT \
   --serve-all-traffic-latest-revision \
@@ -357,10 +352,11 @@ gcloud functions deploy document-status \
 
 echo "Deploying image-processing"
 cd ..
-cd image-process-cfobf
+cd image-process-cf
+git checkout deployment
 gcloud functions deploy image-processing \
   --runtime python39 \
-  --entry-point my_http_function \
+  --entry-point main_func \
   --service-account  $GKE_SERVICE_ACCOUNT \
   --set-env-vars=SCHEMA=disearch_search,LOG_EXECUTION_ID=true \
   --set-secrets 'LOG_INDEX=LOG_INDEX:latest,LOGS_URL=LOGS_URL:latest,gpt_key=OPENAI_API_KEY:latest' \
@@ -370,20 +366,21 @@ gcloud functions deploy image-processing \
   --gen2 \
   --region us-central1 \
   --memory 2G
-  --quiet 
+  
 
 echo "Deploying Metadata Extractor"
 cd ..
-cd metadata-extractor-cfobf
+cd metadata-extractor-cf
+git checkout deployment
 gcloud functions deploy update_metadata_ingested_document \
   --runtime python39 \
   --trigger-http \
-  --entry-point hello_http \
+  --entry-point main_func \
   --set-env-vars=LOG_EXECUTION_ID=true \
   --set-secrets=project_id=projects/$PROJECT_ID/secrets/project_id:latest \
   --service-account $GKE_SERVICE_ACCOUNT \
   --vpc-connector disearch-vpc-connector --region us-central1 --serve-all-traffic-latest-revision --gen2 --memory 1G
-  --quiet
+cd ..
 
 
 
@@ -570,54 +567,67 @@ update_or_create_secret "vertexai_python_url" $(kubectl get service vertexai-ser
 update_or_create_secret "vertexai-summary" $(kubectl get service vertexai-summary-service -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
 update_or_create_secret "pdf_loadbalancer" $(kubectl get service pdflb -o=jsonpath='http://{.status.loadBalancer.ingress[0].ip}')
 
-
+#   _____  _____ _____     _____ ______ _____ _____  ______ _______ _____ 
+#  / ____|/ ____|  __ \   / ____|  ____/ ____|  __ \|  ____|__   __/ ____|
+# | |  __| |    | |__) | | (___ | |__ | |    | |__) | |__     | | | (___  
+# | | |_ | |    |  ___/   \___ \|  __|| |    |  _  /|  __|    | |  \___ \ 
+# | |__| | |____| |       ____) | |___| |____| | \ \| |____   | |  ____) |
+#  \_____|\_____|_|      |_____/|______\_____|_|  \_\______|  |_| |_____/ 
+                                                                         
+                                                                         
 # Replace for vertexai-referer secret
+echo "Adding WEBSITE_URL to GCP Secret named vertexai-referer"
 SECRET_NAME="vertexai-referer"
-NEW_VERSION_DATA="$WEBSITE_URL"
 
-# Encode the new version data to Base64 (optional, if needed)
-ENCODED_NEW_DATA=$(echo -n "$NEW_VERSION_DATA" | base64)
+echo "Checking if WEBSITE_URL is already present in the GCP Secret named $SECRET_NAME..."
 
-# Retrieve existing versions of the secret
-EXISTING_VERSIONS=$(gcloud secrets versions list "$SECRET_NAME" --format="value(name)")
-
-# Function to decode and check if the value exists
-check_existing_data() {
-  for version in $EXISTING_VERSIONS; do
-    EXISTING_DATA=$(gcloud secrets versions access "$version" --secret="$SECRET_NAME")
-    ENCODED_EXISTING_DATA=$(echo -n "$EXISTING_DATA" | base64)
-    if [ "$ENCODED_NEW_DATA" == "$ENCODED_EXISTING_DATA" ]; then
-      echo "The new version data already exists in version $version."
-      return 0
-    fi
-  done
-  return 1
-}
-
-# Check if the new version data already exists
-if check_existing_data; then
-  echo "The new version data already exists. Skipping adding a new version."
-else
-  # Create a temporary file to hold the new version data
-  TMP_FILE=$(mktemp)
-  echo -n "$NEW_VERSION_DATA" > "$TMP_FILE"
-
-  # Add the new version to the existing secret
-  gcloud secrets versions add "$SECRET_NAME" --data-file="$TMP_FILE"
-
-  # Clean up the temporary file
-  rm "$TMP_FILE"
-
-  # Print a success message
-  echo "New version added to secret $SECRET_NAME."
+# Ensure WEBSITE_URL is not empty
+if [ -z "$WEBSITE_URL" ]; then
+  echo "Error: WEBSITE_URL is empty. No update will be performed."
+  exit 1
 fi
 
+# Retrieve the latest version of the secret and its data
+LATEST_VERSION=$(gcloud secrets versions list "$SECRET_NAME" --sort-by='createTime' --limit=1 --format="value(name)")
 
+if [ -z "$LATEST_VERSION" ]; then
+  echo "No versions found for the secret $SECRET_NAME. Creating a new version."
+  TMP_FILE=$(mktemp)
+  echo -n "https://$WEBSITE_URL" > "$TMP_FILE"
+  gcloud secrets versions add "$SECRET_NAME" --data-file="$TMP_FILE"
+  rm "$TMP_FILE"
+  echo "New version added to secret $SECRET_NAME."
+else
+  LATEST_VERSION_NUMBER=$(echo "$LATEST_VERSION" | awk '{print $1}')
+  EXISTING_DATA=$(gcloud secrets versions access "$LATEST_VERSION_NUMBER" --secret="$SECRET_NAME")
 
+  # Compare the existing data with the new data
+  if [ "$EXISTING_DATA" == "$WEBSITE_URL" ]; then
+    echo "The WEBSITE_URL is already present in the latest version. Skipping update."
+  else
+    echo "The WEBSITE_URL is not present. Creating a new version."
+    TMP_FILE=$(mktemp)
+    echo -n "$WEBSITE_URL" > "$TMP_FILE"
+    gcloud secrets versions add "$SECRET_NAME" --data-file="$TMP_FILE"
+    rm "$TMP_FILE"
+    echo "New version added to secret $SECRET_NAME."
+  fi
+fi
+
+echo "Proceeding to the next steps..."
+
+#   _____ ____  _____   _____ 
+#  / ____/ __ \|  __ \ / ____|
+# | |   | |  | | |__) | (___  
+# | |   | |  | |  _  / \___ \ 
+# | |___| |__| | | \ \ ____) |
+#  \_____\____/|_|  \_\_____/ 
+                             
+                             
 echo "Replacing Values For Cors"
-sed -i "s|REPLACE_WITH_WEBSITE_URL|$WEBSITE_URL|g" cors.json
-gsutil set cors cors.json gs://$BUCKET_NAME
-gsutil get cors gs://$BUCKET_NAME
+sed -i "s|REPLACE_WITH_WEBSITE_URL|https://$WEBSITE_URL|g" cors.json
+gsutil cors set cors.json gs://$BUCKET_NAME
+gsutil cors get gs://$BUCKET_NAME
 
 #   _____ _                 _   _____
 #  / ____| |               | | |  __ \
@@ -641,7 +651,7 @@ gcloud run deploy pdf-convert-pubsub --image=$PDF_CONVERT_PUBSUB_ID --set-env-va
 
 echo "Deploying DiSearch Cloud Run"
 gcloud run deploy disearch \
---image=gcr.io/aretecinc-public/ \
+--image=$DISEARCH_IMAGE_ID \
 --set-env-vars=ALLOWED_ORIGIN=$WEBSITE_URL --set-env-vars=appName=disearch --set-env-vars=schema=disearch --set-env-vars=AUTH_EMAIL=$DEFAULT_OWNER_EMAIL --set-env-vars=IS_PENSDOWN=false --set-env-vars=IS_CONTEXT=false \
 --set-cloudsql-instances=$PROJECT_ID:us-central1:disearch-db \
 --service-account=gke-sa@$PROJECT_ID.iam.gserviceaccount.com \
@@ -650,6 +660,14 @@ gcloud run deploy disearch \
 --region=us-central1 \
 --project=$PROJECT_ID
 
+#  _____   ____  __  __          _____ _   _ 
+# |  __ \ / __ \|  \/  |   /\   |_   _| \ | |
+# | |  | | |  | | \  / |  /  \    | | |  \| |
+# | |  | | |  | | |\/| | / /\ \   | | | . ` |
+# | |__| | |__| | |  | |/ ____ \ _| |_| |\  |
+# |_____/ \____/|_|  |_/_/    \_\_____|_| \_|
+                                            
+                                            
 # Extract the domain from the URL
 DOMAIN=$(echo $WEBSITE_URL | awk -F[/:] '{print $4}')
 
@@ -658,10 +676,20 @@ echo "WEBSITE_URL: $WEBSITE_URL"
 echo "DOMAIN: $DOMAIN"
 
 echo "Domain Mapping on Managed Cloud RUN"
-gcloud beta run domain-mappings create --service disearch --domain $DOMAIN --region $REGION
+gcloud beta run domain-mappings create --service disearch --domain $WEBSITE_URL --region $REGION
 
 
+#       _  ____  ____    ______ ____  _____    _      _      __  __   __  __  ____  _____  ______ _       _____ 
+#      | |/ __ \|  _ \  |  ____/ __ \|  __ \  | |    | |    |  \/  | |  \/  |/ __ \|  __ \|  ____| |     / ____|
+#      | | |  | | |_) | | |__ | |  | | |__) | | |    | |    | \  / | | \  / | |  | | |  | | |__  | |    | (___  
+#  _   | | |  | |  _ <  |  __|| |  | |  _  /  | |    | |    | |\/| | | |\/| | |  | | |  | |  __| | |     \___ \ 
+# | |__| | |__| | |_) | | |   | |__| | | \ \  | |____| |____| |  | | | |  | | |__| | |__| | |____| |____ ____) |
+#  \____/ \____/|____/  |_|    \____/|_|  \_\ |______|______|_|  |_| |_|  |_|\____/|_____/|______|______|_____/ 
+                                                                                                               
+echo "Adding LLM Models on Cloud SQL Instance"
+gcloud run jobs create llm-model-migration --image=$LLM_MODEL_IMPORT_ID \
+  --vpc-connector=disearch-vpc-connector --set-cloudsql-instances=$PROJECT_ID:us-central1:disearch-db \
+  --region=us-central1 --set-secrets=DB_HOST=DB_HOST:latest,DB_PASSWORD=DB_PASSWORD:latest \
+  --project=$PROJECT_ID --service-account=terraform@$PROJECT_ID.iam.gserviceaccount.com
 
-
-
-
+gcloud run jobs execute llm-model-migration --region us-central1

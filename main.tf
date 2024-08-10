@@ -222,6 +222,12 @@ resource "google_project_service" "Cloud_Datastore_API" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "SQL_Component_API" {
+  service = "sql-component.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy = false
+}
+
 
 //SERVICES ENDS HERE-------------------------------------------------
 

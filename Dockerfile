@@ -9,6 +9,7 @@ WORKDIR /workspace
 COPY ./script.sh .
 COPY ./main.tf .
 COPY ./variables.tf .
+COPY ./cors.json .
 #COPY ./kubeconfig.tpl .
 #ENV GOOGLE_APPLICATION_CREDENTIALS=/workspace/credentials.json
 

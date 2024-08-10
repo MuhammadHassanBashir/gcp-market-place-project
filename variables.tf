@@ -152,7 +152,7 @@ variable "SCHEMA" {
 variable "OPENAI_API_KEY" {
   description = "KEY"
   type        = string
-  default     = "value-for-open-ai-key"
+  default     = ""
 }
 
 variable "APP_VERSION" {
