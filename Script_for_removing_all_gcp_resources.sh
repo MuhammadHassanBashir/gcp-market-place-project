@@ -31,7 +31,6 @@ gcloud secrets delete aretec_admin --project=$PROJECT_ID --quiet
 gcloud secrets delete DB_HOST --project=$PROJECT_ID --quiet
 gcloud secrets delete DB_PASSWORD --project=$PROJECT_ID --quiet
 gcloud secrets delete DB_USER --project=$PROJECT_ID --quiet
-gcloud secrets delete DEFAULT_OWNER_EMAIL --project=$PROJECT_ID --quiet
 gcloud secrets delete DOCUMENT_CHAT_URL --project=$PROJECT_ID --quiet
 gcloud secrets delete GCP_BUCKET --project=$PROJECT_ID --quiet
 gcloud secrets delete image_summary_cloud_fn --project=$PROJECT_ID --quiet
@@ -42,11 +41,8 @@ gcloud secrets delete metadata_cloud_fn --project=$PROJECT_ID --quiet
 gcloud secrets delete OPENAI_API_KEY --project=$PROJECT_ID --quiet
 gcloud secrets delete pdf_loadbalancer --project=$PROJECT_ID --quiet
 gcloud secrets delete project_id --project=$PROJECT_ID --quiet
-gcloud secrets delete PROJECT_ID --project=$PROJECT_ID --quiet
-gcloud secrets delete PROJECT_NUMBER --project=$PROJECT_ID --quiet
 gcloud secrets delete redis-url --project=$PROJECT_ID --quiet
 gcloud secrets delete SCHEMA --project=$PROJECT_ID --quiet
-gcloud secrets delete SERVICE_ACCOUNT_KEY --project=$PROJECT_ID --quiet
 gcloud secrets delete service_key --project=$PROJECT_ID --quiet
 gcloud secrets delete status_cloud_fn --project=$PROJECT_ID --quiet
 gcloud secrets delete storage_bucket --project=$PROJECT_ID --quiet
@@ -56,7 +52,6 @@ gcloud secrets delete vertexai_followup --project=$PROJECT_ID --quiet
 gcloud secrets delete vertexai_python_url --project=$PROJECT_ID --quiet
 gcloud secrets delete vertexai-referer --project=$PROJECT_ID --quiet
 gcloud secrets delete vertexai-summary --project=$PROJECT_ID --quiet
-gcloud secrets delete WEBSITE_URL --project=$PROJECT_ID --quiet
 
 # Delete Pub/Sub topics and subscriptions
 gcloud pubsub topics delete dead-letter-topic --project=$PROJECT_ID --quiet
