@@ -23,7 +23,7 @@ gcloud compute networks subnets delete uscentral-disearch-vpc01-subnet1000024 --
 gcloud compute networks subnets delete uscentral-disearch-vpc01-subnet1010016-gke --project=$PROJECT_ID --region=us-central1 --quiet
 
 # Delete disks
-gcloud compute disks delete pd-ssd-disk-1 --project=$PROJECT_ID --zone=us-central1-a --quiet
+gcloud compute disks delete pd-ssd-disk-1 --project=$PROJECT_ID --zone=us-central1-c --quiet
 
 # Delete GCP Secrets
 gcloud secrets delete APP_VERSION --project=$PROJECT_ID --quiet
