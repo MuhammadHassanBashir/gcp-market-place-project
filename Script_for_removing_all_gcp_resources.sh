@@ -78,7 +78,7 @@ gcloud functions delete image-processing --project=$PROJECT_ID --region=us-centr
 gcloud functions delete document-status --project=$PROJECT_ID --region=us-central1 --quiet
 
 # Delete Service Accounts
-gcloud iam service-accounts delete terraform@$PROJECT_ID.iam.gserviceaccount.com --quiet
 gcloud iam service-accounts delete gke-sa@$PROJECT_ID.iam.gserviceaccount.com --quiet
+gcloud iam service-accounts delete terraform@$PROJECT_ID.iam.gserviceaccount.com --quiet
 
 echo "All specified resources have been deleted."
