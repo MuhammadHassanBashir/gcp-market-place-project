@@ -306,11 +306,11 @@ BUCKET_NAME=$(gcloud secrets versions access latest --secret="GCP_BUCKET")
 echo "Bucket name: $BUCKET_NAME"
 
 # Clone the GitHub repository
-git clone https://github.com/Aretec-Inc/uploader-trigger-cf.git
-git clone https://github.com/Aretec-Inc/document-status-cf.git
-git clone https://github.com/Aretec-Inc/image-process-cf.git
-git clone https://github.com/Aretec-Inc/metadata-extractor-cf.git
-git clone https://github.com/Aretec-Inc/pdf-convert-cf.git
+git clone https://github_token@github.com/Aretec-Inc/uploader-trigger-cf.git
+git clone https://github_token@github.com/Aretec-Inc/document-status-cf.git
+git clone https://github_token@github.com/Aretec-Inc/image-process-cf.git
+git clone https://github_token@github.com/Aretec-Inc/metadata-extractor-cf.git
+git clone https://github_token@github.com/Aretec-Inc/pdf-convert-cf.git
 
 GCS_SERVICE_ACCOUNT=$(gsutil kms serviceaccount -p $PROJECT_NUMBER)
 
@@ -333,9 +333,9 @@ gcloud functions deploy uploader-trigger \
   --region us-central1 \
   --gen2 \
   --quiet
+cd ..
 
 echo "Deploying document-status"
-cd ..
 cd document-status-cf
 git checkout deployment
 gcloud functions deploy document-status \
@@ -349,9 +349,9 @@ gcloud functions deploy document-status \
   --region us-central1 \
   --gen2 \
   --quiet
+cd ..
 
 echo "Deploying image-processing"
-cd ..
 cd image-process-cf
 git checkout deployment
 gcloud functions deploy image-processing \
@@ -366,10 +366,9 @@ gcloud functions deploy image-processing \
   --gen2 \
   --region us-central1 \
   --memory 2G
-  
+cd ..  
 
 echo "Deploying Metadata Extractor"
-cd ..
 cd metadata-extractor-cf
 git checkout deployment
 gcloud functions deploy update_metadata_ingested_document \
@@ -381,7 +380,6 @@ gcloud functions deploy update_metadata_ingested_document \
   --service-account $GKE_SERVICE_ACCOUNT \
   --vpc-connector disearch-vpc-connector --region us-central1 --serve-all-traffic-latest-revision --gen2 --memory 1G
 cd ..
-
 
 
 #  _    _ _____  _         _____                    _
@@ -446,14 +444,6 @@ done
 # Continue to the next step
 echo "All secrets processed. Proceeding to next steps."
 
-
-
-
-
-
-
-
-
 #  _____  _    _ ____   _____ _    _ ____
 # |  __ \| |  | |  _ \ / ____| |  | |  _ \
 # | |__) | |  | | |_) | (___ | |  | | |_) |
@@ -506,17 +496,6 @@ gcloud pubsub subscriptions create pdf-subscription \
     --message-retention-duration=7d \
     --expiration-period=31d \
     --ack-deadline=600
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -625,7 +604,8 @@ echo "Proceeding to the next steps..."
                              
                              
 echo "Replacing Values For Cors"
-sed -i "s|REPLACE_WITH_WEBSITE_URL|https://$WEBSITE_URL|g" cors.json
+#chmod 644 cors.json
+sed -i "s|REPLACE_WITH_WEBSITE_URL|$WEBSITE_URL|g" cors.json
 gsutil cors set cors.json gs://$BUCKET_NAME
 gsutil cors get gs://$BUCKET_NAME
 
