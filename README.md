@@ -1,15 +1,29 @@
 This guide provides instructions on how to run Deployer images in a Cloud Run job with the necessary environment variables and how to create and configure a service account with the required IAM role permissions.
 
+
+## Step 1: Authenticate with Google Cloud:
+Use the following command to authenticate your local environment with your Google Cloud account:
+
+    gcloud auth login
+
+This command will open a web browser where you can log in with your Google account.
+
+After authentication, set your active Google Cloud project by running:
+
+    gcloud config set project YOUR_GCP_PROJECT_ID
+
+Replace YOUR_GCP_PROJECT_ID with your actual Google Cloud project ID.  
+
 ## Creating and Configuring the Service Account using gcloud commands.
 
-## Step 1: Create the Service Account
+## Step 2: Create the Service Account
 
 Use the following gcloud command to create a new service account:
 
     gcloud iam service-accounts create terraform \
     --display-name="terraform"
     
-## Step 2: Assign IAM Role Permissions
+## Step 3: Assign IAM Role Permissions
 
 Assign the required IAM roles to the service account with the following command:     
     
@@ -60,9 +74,14 @@ Assign the required IAM roles to the service account with the following command:
     gcloud projects add-iam-policy-binding "YOUR_GCP_PROJECT_ID" \
       --member="serviceAccount:terraform@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com" \
       --role="roles/iam.workloadIdentityUser"
+    
+    gcloud projects add-iam-policy-binding "YOUR_GCP_PROJECT_ID" \
+      --member="serviceAccount:terraform@"YOUR_GCP_PROJECT_ID".iam.gserviceaccount.com" \
+      --role="roles/servicenetworking.networksAdmin"
 
 
-## Step 3: Generate the Service Account Key
+
+## Step 4: Generate the Service Account Key
   
 Generate the service account key and save it to a JSON file:
     
@@ -75,7 +94,7 @@ After generating the new key, activate the service account using:
 
     cd ~ && gcloud auth activate-service-account --key-file=key-file.json
 
-## Step 4: Creating Secrets in GCP Secret Manager
+## Step 5: Creating Secrets in GCP Secret Manager
 
 Use gcloud command for creating secrets in GCP Secret Manager
 
@@ -93,7 +112,7 @@ After creating the secrets, you can add the actual values to them by adding secr
     echo -n "your-website-url.com" | gcloud secrets versions add WEBSITE_URL --data-file=-
     echo -n "$(cat ~/key-file.json)" | gcloud secrets versions add SERVICE_ACCOUNT_KEY --data-file=-
 
-## Step 5: Create and Execute Cloud Run Job
+## Step 6: Create and Execute Cloud Run Job
 
       gcloud run jobs create deployer \
         --image=gcr.io/aretecinc-public/disearch/deployer/deployer:1.0 \
