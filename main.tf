@@ -31,16 +31,6 @@ provider "google" {
 
 
 
-
-
-
-
-
-
-
-
-
-
 //SERVICESSS START HERE
 
 resource "google_project_service" "enable_cloudbuild" {
@@ -111,7 +101,6 @@ resource "google_project_service" "disable_all_services" {
   service = "iam.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
-
 }
 
 resource "google_project_service" "enable_container" {
@@ -128,10 +117,9 @@ resource "google_project_service" "enable_documentai" {
   disable_on_destroy = false
 }
 
-
 resource "google_project_service" "storage_api" {
   project = var.projectName
-  service = "storage-api.googleapis.com"  # Adjust the API service name
+  service = "storage.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
@@ -144,6 +132,7 @@ resource "google_project_service" "storage" {
 }
 
 resource "google_project_service" "enable_compute" {
+  project = var.projectName
   service = "compute.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
@@ -157,76 +146,126 @@ resource "google_project_service" "enable_vpcaccess" {
 }
 
 resource "google_project_service" "service_usage" {
+  project = var.projectName
   service = "serviceusage.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "secret_manager_api" {
+  project = var.projectName
   service = "secretmanager.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "ai_platform_api" {
+  project = var.projectName
   service = "aiplatform.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "cloud_function_api" {
+  project = var.projectName
   service = "cloudfunctions.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "cloud_build_api" {
+  project = var.projectName
   service = "cloudbuild.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "monitoring_api" {
+  project = var.projectName
   service = "monitoring.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "eventarc" {
+  project = var.projectName
   service = "eventarc.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "eventarc_publishing_api" {
+  project = var.projectName
   service = "eventarcpublishing.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
 resource "google_project_service" "dialogflow" {
+  project = var.projectName
   service = "dialogflow.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
-resource "google_project_service" "Cloud_Dataplex_API" {
+resource "google_project_service" "dataplex" {
+  project = var.projectName
   service = "dataplex.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
-resource "google_project_service" "Cloud_Datastore_API" {
+resource "google_project_service" "datastore" {
+  project = var.projectName
   service = "datastore.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
 
-resource "google_project_service" "SQL_Component_API" {
+resource "google_project_service" "sql_component" {
+  project = var.projectName
   service = "sql-component.googleapis.com"
   disable_dependent_services = true
   disable_on_destroy = false
 }
+
+resource "null_resource" "global_delay" {
+  provisioner "local-exec" {
+    command = "sleep 300" # Wait 5 minutes
+  }
+
+  depends_on = [
+    google_project_service.enable_cloudbuild,
+    google_project_service.enable_containerregistry,
+    google_project_service.enable_secretmanager,
+    google_project_service.enable_naturallanguage,
+    google_project_service.enable_servicenetworking,
+    google_project_service.enable_sqladmin,
+    google_project_service.enable_run,
+    google_project_service.enable_cloudresourcemanager,
+    google_project_service.enable_iamcredentials,
+    google_project_service.disable_all_services,
+    google_project_service.enable_container,
+    google_project_service.enable_documentai,
+    google_project_service.storage_api,
+    google_project_service.storage,
+    google_project_service.enable_compute,
+    google_project_service.enable_vpcaccess,
+    google_project_service.service_usage,
+    google_project_service.secret_manager_api,
+    google_project_service.ai_platform_api,
+    google_project_service.cloud_function_api,
+    google_project_service.cloud_build_api,
+    google_project_service.monitoring_api,
+    google_project_service.eventarc,
+    google_project_service.eventarc_publishing_api,
+    google_project_service.dialogflow,
+    google_project_service.dataplex,
+    google_project_service.datastore,
+    google_project_service.sql_component
+  ]
+} 
+
 
 
 //SERVICES ENDS HERE-------------------------------------------------
@@ -253,13 +292,14 @@ resource "google_compute_global_address" "peering_address" {
   address_type  = "INTERNAL"
   prefix_length = 16
   network       = "default"
+  address     = "10.50.0.0"
 }
 
 resource "google_service_networking_connection" "peering_connection" {
   network                 = "default"
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.peering_address.name]
-  depends_on = [ google_compute_global_address.peering_address ]
+  depends_on = [ google_compute_global_address.peering_address, null_resource.global_delay ]
 }
 
 resource "google_vpc_access_connector" "disearch_vpc_connector" {
@@ -279,7 +319,7 @@ resource "google_vpc_access_connector" "disearch_vpc_connector" {
       id,
     ]
   }
-  depends_on = [ google_service_networking_connection.peering_connection ]
+  depends_on = [ google_service_networking_connection.peering_connection, null_resource.global_delay  ]
 }
 
 
@@ -308,16 +348,16 @@ resource "google_vpc_access_connector" "disearch_vpc_connector" {
 
 resource "google_compute_subnetwork" "uscentral_disearch_vpc01_subnet1000024" {
   name          = var.subnet_name
-  ip_cidr_range = "10.0.0.0/24"
+  ip_cidr_range = "10.2.0.0/24"
   network       = "default"
   region        = var.region
   private_ip_google_access = true
-  depends_on = [ google_vpc_access_connector.disearch_vpc_connector ]
+  depends_on = [ google_vpc_access_connector.disearch_vpc_connector, null_resource.global_delay ]
 }
 
 resource "google_compute_subnetwork" "uscentral_disearch_vpc01_subnet1010016_gke" {
   name          = var.gke_subnet_name
-  ip_cidr_range = "10.1.0.0/16"
+  ip_cidr_range = "10.3.0.0/16"
   network       = "default"
   region        = var.region
   private_ip_google_access = true
@@ -331,7 +371,7 @@ resource "google_compute_subnetwork" "uscentral_disearch_vpc01_subnet1010016_gke
     range_name = "k8s-services-range"
     ip_cidr_range = "10.101.0.0/16"
   }
-  depends_on = [ google_compute_subnetwork.uscentral_disearch_vpc01_subnet1000024 ]
+  depends_on = [ google_compute_subnetwork.uscentral_disearch_vpc01_subnet1000024, null_resource.global_delay ]
 
 }
 
@@ -365,6 +405,7 @@ resource "google_storage_bucket" "disearch_storage_bucket" {
     depends_on = [
     google_project_service.storage_api,
     google_project_service.storage,
+    null_resource.global_delay,
   ]
 }
 
@@ -410,7 +451,7 @@ resource "google_sql_database_instance" "disearch_db_instance" {
   database_version = var.db_version
   project          = var.projectName
   region           = var.region
-  depends_on       = [google_service_networking_connection.peering_connection]
+  depends_on       = [google_service_networking_connection.peering_connection, null_resource.global_delay]
 
   // Specify the network and do not assign IP
   settings {
@@ -572,7 +613,7 @@ resource "google_container_cluster" "disearch_cluster" {
 
   master_authorized_networks_config {
     cidr_blocks {
-      cidr_block = "10.1.0.0/16"
+      cidr_block = "10.3.0.0/16"
     }
     cidr_blocks {
       cidr_block = "111.88.136.0/24"
@@ -587,7 +628,7 @@ resource "google_container_cluster" "disearch_cluster" {
   }
   #monitoring_service = var.stackdriver_monitoring != "false" ? "monitoring.googleapis.com/kubernetes" : ""
   #logging_service = var.stackdriver_logging != "false" ? "logging.googleapis.com/kubernetes" : ""
-  depends_on = [ google_project_service.enable_container]
+  depends_on = [ google_project_service.enable_container, null_resource.global_delay]
 
 
 }
@@ -644,7 +685,7 @@ resource "google_container_node_pool" "general" {
       mode = "GKE_METADATA"
     }
   }
-  depends_on = [ google_container_cluster.disearch_cluster ]
+  depends_on = [ google_container_cluster.disearch_cluster, null_resource.global_delay ]
 }
 
 
@@ -658,7 +699,7 @@ resource "google_container_node_pool" "general" {
 
 
 resource "time_sleep" "wait_360_seconds" {
-  depends_on = [ google_container_node_pool.general ]
+  depends_on = [ google_container_node_pool.general, null_resource.global_delay ]
 
   create_duration = "360s"
 }
@@ -668,13 +709,13 @@ resource "null_resource" "kubectl" {
     provisioner "local-exec" {
         command = "gcloud container clusters get-credentials ${var.gke_cluster_name}  --region=${var.location}"
     }
-    depends_on = [ time_sleep.wait_360_seconds ]
+    depends_on = [ time_sleep.wait_360_seconds, null_resource.global_delay ]
 }
 
 
 
 resource "time_sleep" "wait_90_seconds" {
-  depends_on = [ null_resource.kubectl ]
+  depends_on = [ null_resource.kubectl, null_resource.global_delay ]
 
   create_duration = "90s"
 }
@@ -685,7 +726,7 @@ resource "time_sleep" "wait_90_seconds" {
 
 
 
-data "google_client_config" "default" { depends_on = [ time_sleep.wait_90_seconds ] }
+data "google_client_config" "default" { depends_on = [ time_sleep.wait_90_seconds, null_resource.global_delay ] }
 
 
 # data "template_file" "kubeconfig" {
@@ -696,7 +737,7 @@ data "google_client_config" "default" { depends_on = [ time_sleep.wait_90_second
 #     cluster_endpoint       = "https://${google_container_cluster.disearch_cluster.endpoint}"
 #     cluster_ca_certificate = google_container_cluster.disearch_cluster.master_auth[0].cluster_ca_certificate
 #   }
-#   depends_on = [ data.google_client_config.default ]
+#   depends_on = [ data.google_client_config.default, null_resource.global_delay ]
 # }
 
 # resource "local_file" "kubeconfig" {
@@ -958,6 +999,3 @@ resource "google_secret_manager_secret_version" "OPENAI_API_KEY_version" {
   secret      = google_secret_manager_secret.OPENAI_API_KEY.id
   secret_data = var.OPENAI_API_KEY
 }
-
-
-
